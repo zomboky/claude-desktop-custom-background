@@ -1,0 +1,7 @@
+# Config perso (chemin vers ton image) : utilise config.example.json comme modèle
+config.json
+# Images perso déposées à la racine
+/*.jpg
+/*.jpeg
+/*.png
+/*.webp
