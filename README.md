@@ -1,162 +1,163 @@
 # Claude Desktop Custom Background
 
-Affiche une image de fond, avec l'opacité de ton choix, sur **Claude Desktop**.
+Show a background image, with the opacity of your choice, on **Claude Desktop**.
 
-![Plateforme : Windows](https://img.shields.io/badge/plateforme-Windows%2010%20%7C%2011-0078D4)
-![Dépendances : aucune](https://img.shields.io/badge/d%C3%A9pendances-aucune-brightgreen)
+![Platform: Windows](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4)
+![Dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen)
 
-> **Windows uniquement pour le moment.** Le projet utilise l'API Win32 (fenêtres, événements, DWM) via PowerShell et .NET Framework, fournis avec Windows. Aucun équivalent macOS/Linux n'existe encore.
+> **Windows only for now.** The project relies on the Win32 API (windows, events, DWM) through PowerShell and .NET Framework, both shipped with Windows. There is no macOS or Linux equivalent yet.
 
-![Comparaison de plusieurs opacités](docs/opacity-comparison.png)
+![Comparison of several opacities](docs/opacity-comparison.png)
 
-*Illustrations générées : maquette de l'interface avec l'image d'exemple fournie dans [`assets/`](assets/), pas de vraies captures d'écran. Seule la valeur `opacity` change d'une image à l'autre.*
+*Generated illustrations: a UI mockup with the sample image shipped in [`assets/`](assets/), not real screenshots. Only the `opacity` value changes from one panel to the next.*
 
-## Sommaire
+## Table of contents
 
-- [Pourquoi un calque et pas du CSS ?](#pourquoi-un-calque-et-pas-du-css-)
+- [Why an overlay instead of CSS?](#why-an-overlay-instead-of-css)
 - [Installation](#installation)
 - [Configuration](#configuration)
-- [Lancement avec Claude Desktop](#lancement-avec-claude-desktop)
-- [Fonctionnement](#fonctionnement)
-- [Limites](#limites)
-- [Dépannage](#dépannage)
-- [Désinstallation](#désinstallation)
+- [Starting with Claude Desktop](#starting-with-claude-desktop)
+- [How it works](#how-it-works)
+- [Limitations](#limitations)
+- [Troubleshooting](#troubleshooting)
+- [Uninstall](#uninstall)
+- [Repository contents](#repository-contents)
 
-## Pourquoi un calque et pas du CSS ?
+## Why an overlay instead of CSS?
 
-Claude Desktop est une application Electron : on pourrait imaginer y injecter du CSS. Mais :
+Claude Desktop is an Electron app, so injecting CSS may sound like the obvious route. It is not an option:
 
-- l'application est installée en MSIX dans `C:\Program Files\WindowsApps\`, un dossier en lecture seule qui se met à jour tout seul, donc on ne peut pas la patcher proprement ;
-- elle **refuse volontairement de démarrer** avec un port de debug (`--remote-debugging-port`) : `Claude: refusing to start — a debugging or network-override switch is present on the command line.`
+- the app is installed as an MSIX package in `C:\Program Files\WindowsApps\`, a read-only folder that updates itself, so it cannot be patched cleanly;
+- the app **deliberately refuses to start** with a debugging port (`--remote-debugging-port`): `Claude: refusing to start — a debugging or network-override switch is present on the command line.`
 
-Ce projet ne contourne donc rien : il ne touche pas à Claude. Il affiche **une fenêtre séparée**, transparente aux clics, posée au-dessus de la fenêtre de Claude.
+So this project does not work around anything and never touches Claude. It draws **a separate, click-through window** on top of the Claude window.
 
 ## Installation
 
-### Prérequis
+### Requirements
 
-- Windows 10 ou 11
-- Windows PowerShell 5.1 (déjà présent sur Windows, rien à installer)
+- Windows 10 or 11
+- Windows PowerShell 5.1 (already included in Windows, nothing to install)
 - Claude Desktop
 
-Testé sur Windows 11.
+Tested on Windows 11.
 
-### Étapes
+### Steps
 
-1. **Récupère le projet** : `git clone https://github.com/zomboky/claude-desktop-custom-background.git`, ou télécharge le ZIP depuis GitHub et décompresse-le. Place le dossier à un endroit stable : le lancement automatique en dépend.
+1. **Get the project**: `git clone https://github.com/zomboky/claude-desktop-custom-background.git`, or download the ZIP from GitHub and extract it. Keep the folder somewhere stable: the automatic startup depends on its location.
 
-2. **Choisis ton image** : dépose-la où tu veux (JPG, PNG, BMP, GIF ou TIFF ; le WebP n'est pas géré par .NET Framework). Pour tester sans rien faire, l'image d'exemple [`assets/sample-background.jpg`](assets/sample-background.jpg) est utilisée par défaut.
+2. **Pick your image**: put it anywhere you like (JPG, PNG, BMP, GIF or TIFF; WebP is not supported by .NET Framework). To try it out first, the sample [`assets/sample-background.jpg`](assets/sample-background.jpg) is used by default.
 
-3. **Lance l'installation** dans PowerShell, depuis le dossier du projet :
+3. **Run the installer** in PowerShell, from the project folder:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\install.ps1
    ```
 
-   Le script :
-   - crée `config.json` à partir de [`config.example.json`](config.example.json) s'il n'existe pas ;
-   - crée un raccourci dans ton dossier Démarrage (voir [Lancement avec Claude Desktop](#lancement-avec-claude-desktop)) ;
-   - démarre le calque tout de suite.
+   The script:
+   - creates `config.json` from [`config.example.json`](config.example.json) if it does not exist;
+   - creates a shortcut in your Startup folder (see [Starting with Claude Desktop](#starting-with-claude-desktop));
+   - starts the overlay right away.
 
-4. **Ouvre Claude Desktop** : l'image apparaît. Pas de droits administrateur nécessaires.
+4. **Open Claude Desktop**: the image shows up. No administrator rights needed.
 
-5. **Mets ton image** : édite `config.json` (voir ci-dessous). Le changement est pris en compte en une seconde environ, sans redémarrer.
+5. **Set your image**: edit `config.json` (see below). Changes are picked up within about a second, no restart needed.
 
-Pour un lancement ponctuel, sans installer le démarrage automatique :
+For a one-off run, without installing the automatic startup:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\overlay.ps1
 ```
 
-(la fenêtre PowerShell doit rester ouverte, ou utilise `wscript.exe start-hidden.vbs` pour un lancement sans fenêtre).
+(keep that PowerShell window open, or use `wscript.exe start-hidden.vbs` to run it without any window).
 
 ## Configuration
 
-Tout passe par `config.json`, relu en direct pendant que le calque tourne. `config.json` est ignoré par git : tes chemins personnels ne seront pas publiés.
+Everything is controlled by `config.json`, which is re-read live while the overlay runs. `config.json` is git-ignored, so your personal paths never get published.
 
 ```json
 {
-  "image": "C:/Users/toi/Pictures/mon-fond.png",
+  "image": "C:/Users/you/Pictures/my-background.png",
   "opacity": 0.15,
   "fit": "cover"
 }
 ```
 
-| Clé | Valeur | Rôle |
+| Key | Value | Purpose |
 | --- | --- | --- |
-| `image` | chemin | Image à afficher. Absolu, ou relatif au dossier de `config.json`. |
-| `opacity` | `0.01` à `0.99` (défaut `0.15`) | Opacité du calque. Plus c'est haut, plus l'image masque l'interface. |
-| `fit` | `"cover"` (défaut) ou `"stretch"` | `cover` remplit la fenêtre en recadrant sans déformer ; `stretch` étire l'image aux dimensions de la fenêtre. |
+| `image` | path | Image to display. Absolute, or relative to the folder containing `config.json`. |
+| `opacity` | `0.01` to `0.99` (default `0.15`) | Opacity of the overlay. The higher it is, the more the image hides the interface. |
+| `fit` | `"cover"` (default) or `"stretch"` | `cover` fills the window and crops without distortion; `stretch` stretches the image to the window size. |
 
-> **Attention aux chemins Windows dans le JSON.** Les `\` doivent être doublés (`C:\\Users\\toi\\...`) ou remplacés par des `/` (`C:/Users/toi/...`). Un fichier invalide est ignoré : l'ancienne image reste affichée.
+> **Mind Windows paths in JSON.** Backslashes must be doubled (`C:\\Users\\you\\...`) or replaced by forward slashes (`C:/Users/you/...`). An invalid file is ignored: the previous image stays displayed.
 
-Le calque est dessiné **par-dessus** l'interface (voir [Fonctionnement](#fonctionnement)) : garde une opacité basse, entre `0.05` et `0.2`, pour que le texte reste lisible.
+The overlay is drawn **on top of** the interface (see [How it works](#how-it-works)), so keep the opacity low, between `0.05` and `0.2`, to keep text readable.
 
-## Lancement avec Claude Desktop
+## Starting with Claude Desktop
 
-`install.ps1` ajoute le raccourci `Claude overlay.lnk` dans le dossier Démarrage de Windows (`shell:startup`). À chaque ouverture de session :
+`install.ps1` adds a `Claude overlay.lnk` shortcut to the Windows Startup folder (`shell:startup`). At every login:
 
-1. `start-hidden.vbs` lance `overlay.ps1` sans aucune fenêtre visible ;
-2. le calque attend en tâche de fond, invisible, sans rien afficher tant que Claude Desktop n'est pas ouvert ;
-3. dès qu'une fenêtre de Claude apparaît, il la recouvre. Quand tu réduis ou fermes Claude, il se masque ;
-4. un verrou interne (mutex) empêche de lancer deux instances.
+1. `start-hidden.vbs` launches `overlay.ps1` with no visible window;
+2. the overlay waits in the background, invisible, and shows nothing as long as Claude Desktop is not open;
+3. as soon as a Claude window appears, the overlay covers it. When you minimize or close Claude, it hides;
+4. an internal mutex prevents running two instances.
 
-Résultat : il se comporte comme s'il démarrait avec Claude Desktop, sans que tu aies à y penser. Le processus reste actif en permanence (environ 140 Mo de RAM) ; pour l'arrêter, clic droit sur son icône de la zone de notification, puis **Quitter**.
+The net effect is that it behaves as if it started with Claude Desktop, without you having to think about it. Strictly speaking it starts with your session, not with Claude. The process stays running (about 140 MB of RAM); to stop it, right-click its notification-area icon and choose **Quit**.
 
-Pour le relancer à la main :
+To restart it manually:
 
 ```powershell
 wscript.exe .\start-hidden.vbs
 ```
 
-## Fonctionnement
+## How it works
 
-![Schéma des couches](docs/how-it-works.png)
+![Layer diagram](docs/how-it-works.png)
 
-Tout est dans [`overlay.ps1`](overlay.ps1) : un petit programme C# compilé à la volée par PowerShell (`Add-Type`), sans rien à installer.
+Everything lives in [`overlay.ps1`](overlay.ps1): a small C# program compiled on the fly by PowerShell (`Add-Type`), with nothing to install.
 
-- **Une fenêtre séparée.** Le calque est un formulaire WinForms sans bordure avec les styles étendus `WS_EX_TRANSPARENT` (les clics passent au travers), `WS_EX_NOACTIVATE` (il ne prend jamais le focus) et `WS_EX_TOOLWINDOW` (pas d'entrée dans la barre des tâches ni dans Alt+Tab). L'opacité est celle de la fenêtre elle-même (`Form.Opacity`).
-- **Il retrouve Claude.** Il énumère les fenêtres de premier niveau de classe `Chrome_WidgetWin_1` appartenant à un processus `claude`, et garde la plus grande.
-- **Il suit Claude par événements.** Avec `SetWinEventHook`, Windows le prévient à chaque déplacement ou redimensionnement de la fenêtre (`EVENT_OBJECT_LOCATIONCHANGE`), au changement de premier plan, à la minimisation et à l'affichage/masquage. Pas de boucle de surveillance rapide : un minuteur de 250 ms ne sert que de filet de sécurité (ouverture de Claude, ordre des fenêtres).
-- **Dimensions exactes.** Il lit la zone visible via `DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS)`, qui exclut les marges invisibles de Windows 10/11, et se déclare compatible per-monitor DPI v2 pour avoir de vrais pixels sur les écrans à mise à l'échelle.
-- **Ordre Z.** Il se place **juste au-dessus de Claude** (`SetWindowPos` avec la fenêtre qui précède Claude), et non en « toujours au premier plan » : les autres fenêtres passent devant, comme elles le feraient devant Claude.
-- **Image rapide.** L'image est décodée une fois, réduite à la taille du plus grand écran et convertie en `Format32bppPArgb` (le format le plus rapide à dessiner). Une copie recadrée à la taille exacte de la fenêtre est mise en cache : déplacer la fenêtre ne redessine rien, la redimensionner ne refait que cette copie.
-- **Coins arrondis.** `DWMWA_WINDOW_CORNER_PREFERENCE` est réglé sur arrondi (Windows 11) pour épouser la fenêtre.
-- **Config en direct.** `config.json` est surveillé (date de modification) et rechargé sans redémarrage.
+- **A separate window.** The overlay is a borderless WinForms form using the extended styles `WS_EX_TRANSPARENT` (clicks go through), `WS_EX_NOACTIVATE` (it never takes focus) and `WS_EX_TOOLWINDOW` (no taskbar button, no Alt+Tab entry). The opacity is the window's own (`Form.Opacity`).
+- **It finds Claude.** It enumerates top-level windows of class `Chrome_WidgetWin_1` owned by a `claude` process and keeps the largest one.
+- **It follows Claude through events.** With `SetWinEventHook`, Windows notifies it on every move or resize of the window (`EVENT_OBJECT_LOCATIONCHANGE`), on foreground changes, on minimize/restore and on show/hide. There is no fast polling loop: a 250 ms timer is only a safety net (Claude opening, window order).
+- **Exact dimensions.** It reads the visible frame with `DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS)`, which excludes the invisible margins of Windows 10/11, and declares itself per-monitor DPI v2 aware so it works in real pixels on scaled displays.
+- **Z-order.** It sits **right above Claude** (`SetWindowPos` with the window that precedes Claude), rather than being "always on top": other windows stay in front, exactly as they would in front of Claude.
+- **Fast image.** The image is decoded once, downscaled to the size of the largest screen and converted to `Format32bppPArgb` (the fastest format to draw). A copy cropped to the exact window size is cached: moving the window repaints nothing, resizing it only rebuilds that copy.
+- **Rounded corners.** `DWMWA_WINDOW_CORNER_PREFERENCE` is set to rounded (Windows 11) to match the window.
+- **Live config.** `config.json` is watched (modification time) and reloaded without a restart.
 
-## Limites
+## Limitations
 
-- **Windows uniquement.** Aucun support macOS ou Linux pour l'instant.
-- **Le calque est au-dessus de l'interface**, pas derrière : les fonds de Claude sont opaques, un calque placé derrière serait invisible. L'image se superpose donc au texte, d'où l'opacité basse conseillée.
-- **Le suivi n'est pas parfaitement synchrone** : c'est une fenêtre séparée qui suit Claude. Un léger décalage est possible pendant un déplacement très rapide.
-- Le calque suit **une seule fenêtre Claude** : la plus grande visible.
-- Ce n'est pas une fonction de Claude Desktop : une mise à jour majeure de l'application qui changerait le type de ses fenêtres pourrait nécessiter d'adapter la détection (`IsClaudeWindow` dans `overlay.ps1`).
-- L'opacité est uniforme sur toute l'image, il n'y a pas de dégradé.
+- **Windows only.** No macOS or Linux support for now.
+- **The overlay is above the interface**, not behind it: Claude's backgrounds are opaque, so an overlay placed behind would be invisible. The image therefore sits on top of the text, hence the low opacity recommended.
+- **Tracking is not perfectly synchronous**: a separate window follows Claude, so a slight lag is possible during very fast moves.
+- The overlay follows **a single Claude window**: the largest visible one.
+- This is not a Claude Desktop feature: a major app update that changes the type of its windows could require adapting the detection (`IsClaudeWindow` in `overlay.ps1`).
+- Opacity is uniform over the whole image; there is no gradient.
 
-## Dépannage
+## Troubleshooting
 
-**L'image n'apparaît pas.**
-- Vérifie que le calque tourne : `Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match 'overlay.ps1' }`.
-- Vérifie que `config.json` est du JSON valide (chemins avec `/` ou `\\`) et que l'image existe.
-- Pour voir les messages, lance `overlay.ps1` dans une fenêtre PowerShell visible : `config: opacity=… image=…` confirme le chargement, `config: …` suivi d'une erreur en indique la cause.
+**The image does not show up.**
+- Check that the overlay is running: `Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match 'overlay.ps1' }`.
+- Check that `config.json` is valid JSON (paths with `/` or `\\`) and that the image exists.
+- To see its messages, run `overlay.ps1` in a visible PowerShell window: `config: opacity=… image=…` confirms the load, while `config: …` followed by an error tells you the cause.
 
-**Le calque ne se lance pas à l'ouverture de session.** Vérifie que `Claude overlay.lnk` est dans `shell:startup` et que le dossier du projet n'a pas été déplacé : relance `install.ps1` depuis le nouvel emplacement.
+**The overlay does not start at login.** Check that `Claude overlay.lnk` is in `shell:startup` and that the project folder has not been moved: run `install.ps1` again from the new location.
 
-## Désinstallation
+## Uninstall
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
 ```
 
-Le script arrête le calque et supprime le raccourci de démarrage. Aucun fichier de Claude Desktop n'ayant été modifié, il n'y a rien d'autre à restaurer. Tu peux ensuite supprimer le dossier du projet.
+The script stops the overlay and removes the startup shortcut. Since no Claude Desktop file was ever modified, there is nothing else to restore. You can then delete the project folder.
 
-## Contenu du dépôt
+## Repository contents
 
-| Fichier | Rôle |
+| File | Purpose |
 | --- | --- |
-| `overlay.ps1` | Le calque (PowerShell + C# inline). |
-| `start-hidden.vbs` | Lance `overlay.ps1` sans fenêtre. |
-| `install.ps1` / `uninstall.ps1` | Ajoute / retire le lancement automatique. |
-| `config.example.json` | Modèle de configuration. |
-| `assets/sample-background.jpg` | Image d'exemple générée pour ce projet. |
-| `docs/` | Illustrations du README. |
+| `overlay.ps1` | The overlay (PowerShell + inline C#). |
+| `start-hidden.vbs` | Runs `overlay.ps1` without a window. |
+| `install.ps1` / `uninstall.ps1` | Add / remove the automatic startup. |
+| `config.example.json` | Configuration template. |
+| `assets/sample-background.jpg` | Sample image generated for this project. |
+| `docs/` | README illustrations. |
