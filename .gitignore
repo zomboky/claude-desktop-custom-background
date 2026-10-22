@@ -5,3 +5,5 @@ config.json
 /*.jpeg
 /*.png
 /*.webp
+# Cache Python
+__pycache__/
