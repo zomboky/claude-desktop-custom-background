@@ -60,6 +60,14 @@ public class ClaudeOverlay : Form
     WinEventProc hookProc;
     readonly List<IntPtr> hooks = new List<IntPtr>();
 
+    // Mis à jour par le watcher média (runspace PowerShell) : Claude lit une vidéo / un son.
+    public static volatile bool MediaPlaying;
+    bool hideOnMedia = true;
+    bool manualHidden;   // bascule Ctrl+Alt+B ou menu de l'icône
+
+    [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr h, int id, uint mods, uint vk);
+    const int WM_HOTKEY = 0x312;
+
     ClaudeOverlay(string cfgPath)
     {
         this.cfgPath = cfgPath;
@@ -70,10 +78,17 @@ public class ClaudeOverlay : Form
         DoubleBuffered = true;
         Opacity = 0.15;
         int round = 2; // coins arrondis Win11 (ignoré ailleurs)
-        HandleCreated += delegate { DwmSetWindowAttribute(Handle, 33, ref round, 4); };
+        HandleCreated += delegate
+        {
+            DwmSetWindowAttribute(Handle, 33, ref round, 4);
+            // Ctrl+Alt+B : masquer / afficher (MOD_ALT|MOD_CONTROL|MOD_NOREPEAT)
+            if (!RegisterHotKey(Handle, 1, 0x1 | 0x2 | 0x4000, (uint)Keys.B))
+                Console.Error.WriteLine("raccourci Ctrl+Alt+B déjà utilisé par une autre application");
+        };
 
         var tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "Claude overlay", Visible = true };
         var menu = new ContextMenuStrip();
+        menu.Items.Add("Masquer / afficher (Ctrl+Alt+B)", null, delegate { ToggleManual(); });
         menu.Items.Add("Quitter", null, delegate { tray.Visible = false; Application.Exit(); });
         tray.ContextMenuStrip = menu;
 
@@ -98,6 +113,14 @@ public class ClaudeOverlay : Form
     }
 
     void SafeTick() { try { Tick(); } catch (Exception e) { Console.Error.WriteLine(e.Message); } }
+
+    void ToggleManual() { manualHidden = !manualHidden; SafeTick(); }
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == 1) ToggleManual();
+        base.WndProc(ref m);
+    }
 
     protected override bool ShowWithoutActivation { get { return true; } }
 
@@ -152,6 +175,7 @@ public class ClaudeOverlay : Form
             double op = cfg.ContainsKey("opacity") ? Convert.ToDouble(cfg["opacity"]) : 0.15;
             Opacity = Math.Min(0.99, Math.Max(0.01, op));
             stretch = cfg.ContainsKey("fit") && "stretch".Equals(cfg["fit"] as string, StringComparison.OrdinalIgnoreCase);
+            hideOnMedia = !cfg.ContainsKey("hideWhenMediaPlaying") || Convert.ToBoolean(cfg["hideWhenMediaPlaying"]);
             string p = cfg.ContainsKey("image") ? (string)cfg["image"] : "";
             p = Path.Combine(Path.GetDirectoryName(cfgPath), p);
 
@@ -215,6 +239,8 @@ public class ClaudeOverlay : Form
     {
         if (Environment.TickCount - lastCfgCheck > 1000) { lastCfgCheck = Environment.TickCount; LoadConfig(); }
         if (src == null) return;
+        // Pas de calque au-dessus d'une vidéo en lecture dans Claude, ni quand l'utilisateur l'a masqué.
+        if (manualHidden || (hideOnMedia && MediaPlaying)) { HideOverlay(); return; }
         if (claude == IntPtr.Zero || !IsWindow(claude) || !IsWindowVisible(claude)) claude = FindClaude();
         RECT r;
         if (claude == IntPtr.Zero || IsIconic(claude) || !FrameOf(claude, out r)) { HideOverlay(); return; }
@@ -250,5 +276,32 @@ public class ClaudeOverlay : Form
 }
 '@
 
-Write-Host 'Calque actif. Quitter: icône de notification > Quitter, ou Ctrl+C.'
+# Watcher média : Claude déclare ses lectures audio/vidéo à Windows (System Media Transport Controls).
+# Thread séparé qui interroge les sessions média et met à jour [ClaudeOverlay]::MediaPlaying.
+$mediaWatcher = [powershell]::Create()
+[void]$mediaWatcher.AddScript({
+    try {
+        Add-Type -AssemblyName System.Runtime.WindowsRuntime
+        $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
+        $asTask = [System.WindowsRuntimeSystemExtensions].GetMethods() |
+            Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' } |
+            Select-Object -First 1
+        $task = $asTask.MakeGenericMethod([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]).Invoke($null, @([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()))
+        $mgr = $task.GetAwaiter().GetResult()
+    } catch { return }
+    while ($true) {
+        try {
+            $playing = $false
+            foreach ($s in $mgr.GetSessions()) {
+                if ($s.SourceAppUserModelId -match 'claude' -and $s.GetPlaybackInfo().PlaybackStatus -eq 'Playing') { $playing = $true }
+            }
+            [ClaudeOverlay]::MediaPlaying = $playing
+        } catch { }
+        Start-Sleep -Milliseconds 300
+    }
+})
+$null = $mediaWatcher.BeginInvoke()
+
+Write-Host 'Calque actif. Masquer/afficher: Ctrl+Alt+B. Quitter: icône de notification > Quitter, ou Ctrl+C.'
 [ClaudeOverlay]::Run($Config)
+[Environment]::Exit(0)  # termine aussi le thread du watcher média

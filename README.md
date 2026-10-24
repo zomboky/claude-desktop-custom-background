@@ -91,6 +91,9 @@ Everything is controlled by `config.json`, which is re-read live while the overl
 | `image` | path | Image to display. Absolute, or relative to the folder containing `config.json`. |
 | `opacity` | `0.01` to `0.99` (default `0.15`) | Opacity of the overlay. The higher it is, the more the image hides the interface. |
 | `fit` | `"cover"` (default) or `"stretch"` | `cover` fills the window and crops without distortion; `stretch` stretches the image to the window size. |
+| `hideWhenMediaPlaying` | `true` (default) or `false` | *Windows only.* Hides the overlay while Claude plays video or audio (detected through Windows media sessions), so the image never sits on top of a playing video. |
+
+**Hide / show at any time (Windows):** press **Ctrl+Alt+B**, or use the notification-area icon menu. Useful for embedded content the overlay cannot detect (built-in browser, interactive widgets): Claude renders everything in a single surface and does not expose the position of those elements to other apps.
 
 > **Mind Windows paths in JSON.** Backslashes must be doubled (`C:\\Users\\you\\...`) or replaced by forward slashes (`C:/Users/you/...`). An invalid file is ignored: the previous image stays displayed.
 

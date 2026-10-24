@@ -1,5 +1,6 @@
 {
   "image": "assets/sample-background.jpg",
   "opacity": 0.15,
-  "fit": "cover"
+  "fit": "cover",
+  "hideWhenMediaPlaying": true
 }
